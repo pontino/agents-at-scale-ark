@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.1.51](https://github.com/mckinsey/agents-at-scale-ark/compare/v0.1.50...v0.1.51) (2026-01-16)
+
+
+### Features
+
+* Adding a separate action for publishing docs ([#858](https://github.com/mckinsey/agents-at-scale-ark/issues/858)) ([0a7784a](https://github.com/mckinsey/agents-at-scale-ark/commit/0a7784a80fc5d286de917fd344c72def4c097532))
+* Adding OIDC configuration parameters to the deployment to AWS and GCP ([#832](https://github.com/mckinsey/agents-at-scale-ark/issues/832)) ([8b08076](https://github.com/mckinsey/agents-at-scale-ark/commit/8b0807608064e923d24ffcb518c3f452d691c421))
+* Proxy APIs for A2A & MCP ([#648](https://github.com/mckinsey/agents-at-scale-ark/issues/648)) ([0b8b9db](https://github.com/mckinsey/agents-at-scale-ark/commit/0b8b9db58a660b23d930855754912269a4fb252c))
+
+
+### Bug Fixes
+
+* DataArt penetration testing findings ([#626](https://github.com/mckinsey/agents-at-scale-ark/issues/626)) ([0f333fd](https://github.com/mckinsey/agents-at-scale-ark/commit/0f333fd9ab4972034dbae67dccbe18d6f0e9fc42))
+* Fix Codecov Project Coverage CI ([#871](https://github.com/mckinsey/agents-at-scale-ark/issues/871)) ([b0711b7](https://github.com/mckinsey/agents-at-scale-ark/commit/b0711b7c5145fbd263047dcbfca4c8915d335996))
+* fixed "Dialog & DropdownMenu adds pointer-events: none" shadcn bug  ([#679](https://github.com/mckinsey/agents-at-scale-ark/issues/679)) ([bffcdb4](https://github.com/mckinsey/agents-at-scale-ark/commit/bffcdb44832754f1412b419a97cc1c0ca5e347e9))
+* override security context in devspace for dev mode ([#872](https://github.com/mckinsey/agents-at-scale-ark/issues/872)) ([b2d5b54](https://github.com/mckinsey/agents-at-scale-ark/commit/b2d5b548dc3c7724941a291c1ef28fe02eb4993b))
+* Treat dependabot as a forked PR ([#879](https://github.com/mckinsey/agents-at-scale-ark/issues/879)) ([a230bd1](https://github.com/mckinsey/agents-at-scale-ark/commit/a230bd16ff201c860087dbbc41037ce9b4c309a3))
+
 ## [0.1.50](https://github.com/mckinsey/agents-at-scale-ark/compare/v0.1.49...v0.1.50) (2026-01-14)
 
 
