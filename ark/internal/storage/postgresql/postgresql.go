@@ -343,6 +343,12 @@ func (p *PostgreSQLBackend) List(ctx context.Context, kind, namespace string, op
 	if opts.Continue != "" {
 		cursor, err := strconv.ParseInt(opts.Continue, 10, 64)
 		if err == nil && cursor > 0 {
+			// NOTE: paginated LIST has a known weak-consistency edge case across pages
+			// due to the BIGSERIAL commit-order race documented in postgresWatcher.relist.
+			// A row whose creating transaction was in-flight during page N's snapshot
+			// can commit before page N+1 and not be returned by either page. The proper
+			// fix is snapshot-based pagination (pg_export_snapshot + REPEATABLE READ).
+			// Bites only when total result > opts.Limit (typically 500). Tracked separately.
 			query += fmt.Sprintf(" AND resource_version < $%d", argIndex)
 			args = append(args, cursor)
 			argIndex++
@@ -582,6 +588,7 @@ func (p *PostgreSQLBackend) Watch(ctx context.Context, kind, namespace string, o
 		ctx:         ctx,
 		done:        make(chan struct{}),
 		initialList: true,
+		seenRVs:     make(map[string]int64),
 	}
 
 	p.mu.Lock()
@@ -727,6 +734,12 @@ type postgresWatcher struct {
 	lastSeenRV      atomic.Int64
 	initialList     bool
 	initialListDone bool
+	// seenRVs maps a resource UID to the highest rv we've already emitted for it.
+	// Combined with the lookback window in relist(), this lets us re-fetch rows that
+	// might have been invisible during a prior relist (because their txn was still
+	// in flight) without re-emitting events the consumer already saw.
+	seenMu  sync.Mutex
+	seenRVs map[string]int64
 }
 
 func (w *postgresWatcher) Stop() {
@@ -809,13 +822,23 @@ func (w *postgresWatcher) advanceRV(rv int64) {
 }
 
 func (w *postgresWatcher) relist() {
+	// FIX: BIGSERIAL resource_versions are assigned at INSERT statement time, but row
+	// visibility depends on COMMIT time. Two concurrent INSERTs can commit in the
+	// opposite order from rv assignment, so a strict `rv > lastSeenRV` cursor can skip
+	// past an in-flight rv permanently. Mitigation: re-query with a lookback window,
+	// then dedup by (uid, rv) using w.seenRVs to avoid double-emitting.
+	const lookback int64 = 500
 	lastRV := w.lastSeenRV.Load()
+	queryFromRV := lastRV - lookback
+	if queryFromRV < 0 {
+		queryFromRV = 0
+	}
 
 	query := `
 		SELECT resource_version, generation, namespace, name, uid, spec, status, labels, annotations, finalizers, owner_references, created_at, deleted_at
 		FROM resources
 		WHERE kind = $1 AND resource_version > $2`
-	args := []interface{}{w.kind, lastRV}
+	args := []interface{}{w.kind, queryFromRV}
 	argIndex := 3
 
 	if w.ns != "" {
@@ -850,6 +873,16 @@ func (w *postgresWatcher) relist() {
 			return
 		}
 
+		// Skip rows already emitted at this rv or higher to absorb duplicates from
+		// the lookback window without re-delivering events the consumer already saw.
+		w.seenMu.Lock()
+		if seen, ok := w.seenRVs[uid]; ok && seen >= rv {
+			w.seenMu.Unlock()
+			continue
+		}
+		w.seenRVs[uid] = rv
+		w.seenMu.Unlock()
+
 		obj, err := w.backend.reconstructObject(w.kind, ns, name, rv, generation, uid, string(spec), string(status), string(labels), string(annotations), string(finalizers), string(ownerRefs), createdAt)
 		if err != nil {
 			continue
@@ -873,6 +906,17 @@ func (w *postgresWatcher) relist() {
 		case <-w.ctx.Done():
 			return
 		}
+	}
+	// Bound seenRVs memory: drop entries far below the current cursor.
+	pruneFloor := w.lastSeenRV.Load() - 5000
+	if pruneFloor > 0 {
+		w.seenMu.Lock()
+		for uid, rv := range w.seenRVs {
+			if rv < pruneFloor {
+				delete(w.seenRVs, uid)
+			}
+		}
+		w.seenMu.Unlock()
 	}
 
 	if w.initialList {
