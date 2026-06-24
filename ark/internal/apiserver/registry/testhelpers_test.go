@@ -122,6 +122,10 @@ func (m *mockBackend) Cleanup(ctx context.Context, retention time.Duration) (int
 	return 0, nil
 }
 
+func (m *mockBackend) Ping(ctx context.Context) error {
+	return nil
+}
+
 func (m *mockBackend) Close() error {
 	return nil
 }

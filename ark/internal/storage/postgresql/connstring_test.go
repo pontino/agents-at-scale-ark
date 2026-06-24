@@ -6,6 +6,8 @@ import (
 	"net"
 	"strings"
 	"testing"
+
+	"github.com/lib/pq"
 )
 
 func TestNew_UnreachableDatabase(t *testing.T) {
@@ -75,5 +77,25 @@ func TestBuildConnString(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestBuildConnStringParsesWithSpecialCharPassword(t *testing.T) {
+	passwords := []string{"p@ss w0rd", "has'quote", "back\\slash", "with=equals", "tab\tinside"}
+	for _, pw := range passwords {
+		t.Run(pw, func(t *testing.T) {
+			cfg := Config{Host: "db", Port: 5432, User: "ark", Password: pw, Database: "ark", SSLMode: "require"}
+			connStr := buildConnString(cfg)
+			if _, err := pq.NewConnector(connStr); err != nil {
+				t.Fatalf("DSN %q failed to parse: %v", connStr, err)
+			}
+		})
+	}
+}
+
+func TestBuildConnStringIncludesConnectTimeout(t *testing.T) {
+	connStr := buildConnString(Config{Host: "db", Port: 5432, User: "ark", Password: "pw", Database: "ark", SSLMode: "require"})
+	if !strings.Contains(connStr, "connect_timeout=") {
+		t.Errorf("conn string %q missing connect_timeout", connStr)
 	}
 }

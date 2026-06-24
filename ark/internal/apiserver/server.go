@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -113,8 +114,11 @@ type Config struct {
 	K8sClient       client.Client
 }
 
+const readyzPingTimeout = 2 * time.Second
+
 type Server struct {
 	config  Config
+	mu      sync.RWMutex
 	backend storage.Backend
 	stopCh  chan struct{}
 }
@@ -153,10 +157,13 @@ func (s *Server) Start(ctx context.Context) error {
 		SSLCert:     s.config.PostgresSSLCert,
 		SSLKey:      s.config.PostgresSSLKey,
 	}
-	s.backend, err = postgresql.New(cfg, converter)
+	backend, err := postgresql.New(cfg, converter)
 	if err != nil {
 		return fmt.Errorf("failed to create PostgreSQL backend: %w", err)
 	}
+	s.mu.Lock()
+	s.backend = backend
+	s.mu.Unlock()
 	klog.Infof("Using PostgreSQL storage backend: %s:%d/%s", cfg.Host, cfg.Port, cfg.Database)
 
 	secureServing := genericoptions.NewSecureServingOptions().WithLoopback()
@@ -273,4 +280,16 @@ func (s *Server) installAPIGroups(server *genericapiserver.GenericAPIServer, con
 
 func (s *Server) NeedLeaderElection() bool {
 	return false
+}
+
+func (s *Server) Readyz(_ *http.Request) error {
+	s.mu.RLock()
+	backend := s.backend
+	s.mu.RUnlock()
+	if backend == nil {
+		return fmt.Errorf("storage backend not initialized")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), readyzPingTimeout)
+	defer cancel()
+	return backend.Ping(ctx)
 }
