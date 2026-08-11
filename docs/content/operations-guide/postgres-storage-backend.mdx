@@ -254,7 +254,7 @@ Treat the `resources` table like any other application table:
 Confirm in the database that the slot is gone rather than trusting the Job's log line — both queries should return no rows:
 
 ```sql
-SELECT slot_name, active, wal_status FROM pg_replication_slots WHERE slot_name = 'ark_cdc';
+SELECT slot_name, active FROM pg_replication_slots WHERE slot_name = 'ark_cdc';
 SELECT pubname FROM pg_publication WHERE pubname = 'ark_cdc';
 ```
 
