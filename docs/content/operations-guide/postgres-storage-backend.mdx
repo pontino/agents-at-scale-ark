@@ -46,7 +46,7 @@ max_wal_senders       >= 1
 
 ### Minimum version
 
-The watch stream decodes the WAL with the built-in `pgoutput` plugin and a `CREATE PUBLICATION`, introduced in PostgreSQL 10. The hard minimum is **PostgreSQL 13**: slot health checks read `pg_replication_slots.wal_status` and list pagination calls `pg_current_snapshot()`, neither of which exists in earlier majors. Run a currently-supported major (**14 or newer**) in production.
+The watch stream decodes the WAL with the built-in `pgoutput` plugin and a `CREATE PUBLICATION`, both introduced in **PostgreSQL 10**, which is the hard minimum. Run a currently-supported major (**14 or newer**) in production.
 
 A user/role with permission to:
 
